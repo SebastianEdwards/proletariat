@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
   s.authors     = ['Sebastian Edwards']
   s.email       = ['me@sebastianedwards.co.nz']
   s.homepage    = 'https://github.com/SebastianEdwards/proletariat'
-  s.summary     = %q{Lightweight background workers powered by RabbitMQ}
+  s.summary     = %q{Lightweight background processing powered by RabbitMQ}
   s.description = s.summary
 
   s.files         = `git ls-files`.split("\n")
