@@ -2,6 +2,8 @@
 
 Lightweight background processing in Ruby powered by RabbitMQ and the excellent concurrent-ruby gem.
 
+[![Code Climate](https://codeclimate.com/repos/52d75c166956805abe000226/badges/bf98213c1d629072560c/gpa.png)](https://codeclimate.com/repos/52d75c166956805abe000226/feed)
+
 ### Warning!
 
 This software is early-alpha, may contain bugs and change considerably in the near future.
