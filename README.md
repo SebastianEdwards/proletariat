@@ -26,7 +26,7 @@ And run:
 
 If you aren't using default RabbitMQ connection settings, ensure the `RABBITMQ_URL` env variable is present. Here's how that might look in your `.env` if you use Foreman:
 
-	RABBITMQ_URL=amqp://someuser:somepass@127.0.0.1/another_vhost
+  RABBITMQ_URL=amqp://someuser:somepass@127.0.0.1/another_vhost
 
 ### Setting up a Worker
 
@@ -37,51 +37,61 @@ Proletariat works exclusively on RabbitMQ Topic exchanges and routing keys can b
 The `#work` method should return `:ok` on success or `:drop` / `:requeue` on failure.
 
 Here's a complete example:
-	
-	class SendUserIntroductoryEmail < Proletariat::Worker
-	  listen_on 'user.created'
-	
-	  def work(message)
-	    params = JSON.parse(message)
-	
-	    UserMailer.introductory_email(params).deliver!
-	
-	    publish 'email_sent.user.introductory', {id: params['id']}.to_json
-	
-	    :ok
-	  end
-	end
-	
+
+  class SendUserIntroductoryEmail < Proletariat::Worker
+    listen_on 'user.created'
+
+    def work(message)
+      params = JSON.parse(message)
+
+      UserMailer.introductory_email(params).deliver!
+
+      publish 'email_sent.user.introductory', {id: params['id']}.to_json
+
+      :ok
+    end
+  end
+
 ### Select your Workers
 
 If you are using Rails just create a `proletariat.rb` file in your initializers directory.
 
-	Proletariat.configure worker_classes: [SendUserIntroductoryEmail, SomeOtherWorker]
-	Proletariat.run!
-	
+  Proletariat.configure worker_classes: [SendUserIntroductoryEmail, SomeOtherWorker]
+  Proletariat.run!
+
 Or define the `WORKERS` env variable.
 
-	WORKERS=SendUserIntroductoryEmail,SomeOtherWorker
-	
+  WORKERS=SendUserIntroductoryEmail,SomeOtherWorker
+
+### Deploying on Heroku
+
+It's not recommended to run your background workers in the same process as your main web process. Heroku will shutdown idle `web` processes, killing your background workers in the process. Instead create a new process type for Proletariat by adding the following to your Procfile:
+
+  workers: bundle exec rake proletariat:run
+
+And run:
+
+  heroku ps:scale workers=1
+
 ### Testing with Cucumber
 
 Add the following to your `env.rb`:
 
-	require 'proletariat/cucumber'
-	
+  require 'proletariat/cucumber'
+
 Use the provided helpers in your step definitions to synchronize your test suite with your workers without sacrificing the ability to test in production-like environment:
 
-	When(/^I submit a valid 'register user' form$/) do
-	  wait_for message.on_topic('email_sent.user.introductory') do
-	    visit   ...
-	    fill_in ...
-	    submit  ...
-	  end
-	end
-	
-	Then(/^the user should receive an introductory email$/) do
-	  expect(unread_emails_for(new_user_email).size).to eq 1
-	end
+  When(/^I submit a valid 'register user' form$/) do
+    wait_for message.on_topic('email_sent.user.introductory') do
+      visit   ...
+      fill_in ...
+      submit  ...
+    end
+  end
+
+  Then(/^the user should receive an introductory email$/) do
+    expect(unread_emails_for(new_user_email).size).to eq 1
+  end
 
 ## FAQ
 
