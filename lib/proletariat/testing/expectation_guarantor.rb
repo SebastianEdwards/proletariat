@@ -40,7 +40,7 @@ module Proletariat
       def guarantee
         run_subscribers
 
-        block.call
+        block.call if block
 
         timer = 0.0
 
@@ -107,8 +107,8 @@ module Proletariat
         # Public: Creates a new MessageCounter instance.
         #
         # expected - The number of messages expected.
-        def initialize(expected)
-          @count    = 0
+        def initialize(expected, count = 0)
+          @count    = count
           @expected = expected
         end
 
