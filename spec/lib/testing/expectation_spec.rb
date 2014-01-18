@@ -7,7 +7,7 @@ module Proletariat
         it 'should return a new expectation with given topic' do
           expectation = Expectation.new([], 2)
           expect(expectation.on_topic('lolcats', 'dogs').topics).to \
-            eq ['lolcats', 'dogs']
+            eq %w(lolcats dogs)
         end
       end
     end
