@@ -125,9 +125,10 @@ module Proletariat
     #
     # Returns nil.
     def create_publisher_pool
-      @publishers_mailbox, @publisher_pool = Publisher.pool(publisher_threads,
-                                                            connection,
-                                                            exchange_name)
+      @publishers_mailbox, @publisher_pool = Actor.pool(publisher_threads,
+                                                        Publisher,
+                                                        connection,
+                                                        exchange_name)
     end
 
     # Internal: Creates a new Concurrent::Supervisor.

@@ -77,7 +77,7 @@ module Proletariat
     #
     # Returns nil.
     def create_worker_pool
-      @workers_mailbox, @worker_pool = worker_class.pool(worker_threads)
+      @workers_mailbox, @worker_pool = Actor.pool(worker_threads, worker_class)
 
       nil
     end

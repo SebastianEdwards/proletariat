@@ -5,7 +5,7 @@ require 'bunny'
 require 'logger'
 require 'forwardable'
 
-require 'proletariat/concerns/logging'
+require 'proletariat/concurrency/actor'
 
 require 'proletariat/manager'
 require 'proletariat/publisher'
