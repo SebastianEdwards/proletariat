@@ -8,9 +8,8 @@ module Proletariat
 
     # Public: Creates a new Subscriber instance.
     #
-    # connection    - An open Bunny::Session object.
-    # exchange_name - A String of the RabbitMQ topic exchange.
-    # queue_config  - A QueueConfig value object.
+    # listener     - Object to delegate new messages to.
+    # queue_config - A QueueConfig value object.
     def initialize(listener, queue_config)
       @listener     = listener
       @queue_config = queue_config

@@ -5,11 +5,7 @@ module Proletariat
   class Manager < Concurrent::Supervisor
     # Public: Creates a new Manager instance.
     #
-    # connection    - An open Bunny::Session object.
-    # exchange_name - A String of the RabbitMQ topic exchange.
     # worker_class  - A subclass of Proletariat::Worker to handle messages.
-    # options       - A Hash of additional optional parameters (default: {}):
-    #                 :worker_threads - The size of the worker thread pool.
     def initialize(worker_class)
       super()
 

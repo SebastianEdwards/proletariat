@@ -7,19 +7,9 @@ module Proletariat
     # Public: Delegate lifecycle calls to the supervisor.
     def_delegators :supervisor, :run, :run!, :stop, :running?
 
-    # Public: Creates a new Runner instance. Default options should be fine for
-    #         most scenarios.
-    #
-    # options - A Hash of options (default: {}):
-    #             :connection        - An open RabbitMQ::Session object.
-    #             :exchange_name     - The RabbitMQ topic exchange name as a
-    #                                  String.
-    #             :publisher_threads - The size of the publisher thread pool.
-    #             :supervisor        - A Supervisor instance.
-    #             :worker_classes    - An Array of Worker subclasses.
-    #             :worker_threads    - The size of the worker thread pool.
-    def initialize(options = {})
-      @supervisor        = options.fetch :supervisor, create_supervisor
+    # Public: Creates a new Runner instance.
+    def initialize
+      @supervisor = create_supervisor
 
       @managers = []
 

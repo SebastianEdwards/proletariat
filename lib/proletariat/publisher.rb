@@ -6,9 +6,6 @@ module Proletariat
     include Concerns::Logging
 
     # Public: Creates a new Publisher instance.
-    #
-    # connection    - An open Bunny::Session object.
-    # exchange_name - A String of the RabbitMQ topic exchange.
     def initialize
       @channel  = Proletariat.connection.create_channel
       @exchange = channel.topic(Proletariat.exchange_name, durable: true)
