@@ -2,7 +2,7 @@
 
 Lightweight background processing in Ruby powered by RabbitMQ and the excellent concurrent-ruby gem.
 
-[![Code Climate](https://codeclimate.com/repos/52d75c166956805abe000226/badges/bf98213c1d629072560c/gpa.png)](https://codeclimate.com/repos/52d75c166956805abe000226/feed)
+[![Code Climate](https://codeclimate.com/github/SebastianEdwards/proletariat.png)](https://codeclimate.com/github/SebastianEdwards/proletariat)
 
 ### Warning!
 
