@@ -7,12 +7,6 @@ module Proletariat
     # Public: Delegate lifecycle calls to the supervisor.
     def_delegators :supervisor, :run, :run!, :stop, :running?
 
-    # Public: Returns an open Bunny::Session object.
-    attr_reader :connection
-
-    # Public: Returns the name of the RabbitMQ topic exchange.
-    attr_reader :exchange_name
-
     # Public: Creates a new Runner instance. Default options should be fine for
     #         most scenarios.
     #
@@ -25,12 +19,7 @@ module Proletariat
     #             :worker_classes    - An Array of Worker subclasses.
     #             :worker_threads    - The size of the worker thread pool.
     def initialize(options = {})
-      @connection        = options.fetch :connection, create_connection
-      @exchange_name     = options.fetch :exchange_name, DEFAULT_EXCHANGE_NAME
-      @publisher_threads = options.fetch :publisher_threads, 2
       @supervisor        = options.fetch :supervisor, create_supervisor
-      @worker_classes    = options.fetch :worker_classes, []
-      @worker_threads    = options.fetch :worker_threads, 3
 
       @managers = []
 
@@ -74,17 +63,8 @@ module Proletariat
     # Internal: Returns a shared mailbox for the pool of publishers.
     attr_reader :publishers_mailbox
 
-    # Internal: Returns the number of publisher threads in the publisher pool.
-    attr_reader :publisher_threads
-
     # Internal: Returns the supervisor instance.
     attr_reader :supervisor
-
-    # Internal: Returns an Array of Worker subclasses.
-    attr_reader :worker_classes
-
-    # Internal: Returns the number of worker threads per manager.
-    attr_reader :worker_threads
 
     # Internal: Adds each publisher in the publisher_pool to the supervisor.
     #
@@ -100,7 +80,7 @@ module Proletariat
     #
     # Returns nil.
     def add_workers_to_supervisor
-      worker_classes.each do |worker_class|
+      Proletariat.worker_classes.each do |worker_class|
         manager = create_manager(worker_class)
         @managers << manager
         supervisor.add_worker manager
@@ -109,26 +89,14 @@ module Proletariat
       nil
     end
 
-    # Internal: Creates a new Bunny::Session and opens it.
-    #
-    # Returns an open Bunny::Session instance.
-    def create_connection
-      new_connection = Bunny.new
-      new_connection.start
-
-      new_connection
-    end
-
     # Internal: Assign new Concurrent::Poolbox and Array[Publisher] to the
     #           manager's publishers_mailbox and publisher_pool properties
     #           respectively.
     #
     # Returns nil.
     def create_publisher_pool
-      @publishers_mailbox, @publisher_pool = Actor.pool(publisher_threads,
-                                                        Publisher,
-                                                        connection,
-                                                        exchange_name)
+      threads = Proletariat.publisher_threads
+      @publishers_mailbox, @publisher_pool = Actor.pool(threads, Publisher)
     end
 
     # Internal: Creates a new Concurrent::Supervisor.
@@ -143,8 +111,7 @@ module Proletariat
     #
     # Returns a Manager instance.
     def create_manager(worker_class)
-      Manager.new(connection, exchange_name, worker_class,
-                  worker_threads: worker_threads)
+      Manager.new(worker_class)
     end
   end
 end

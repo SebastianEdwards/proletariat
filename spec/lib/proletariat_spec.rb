@@ -40,10 +40,11 @@ end
 
 describe Proletariat do
   it 'should roughly work' do
-    Proletariat.configure(
-      logger: Logger.new('/dev/null'),
-      worker_classes: [PingWorker, PongWorker]
-    )
+    Proletariat.configure do
+      config.logger         = Logger.new('/dev/null')
+      config.worker_classes = [PingWorker, PongWorker]
+    end
+
     Proletariat.run!
     sleep 2
     Proletariat.publish 'ping', ''

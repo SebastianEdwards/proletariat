@@ -10,13 +10,10 @@ module Proletariat
     # worker_class  - A subclass of Proletariat::Worker to handle messages.
     # options       - A Hash of additional optional parameters (default: {}):
     #                 :worker_threads - The size of the worker thread pool.
-    def initialize(connection, exchange_name, worker_class, options = {})
+    def initialize(worker_class)
       super()
 
-      @connection     = connection
-      @exchange_name  = exchange_name
       @worker_class   = worker_class
-      @worker_threads = options.fetch :worker_threads, 3
 
       create_worker_pool
       create_subscriber
@@ -36,12 +33,6 @@ module Proletariat
 
     private
 
-    # Internal: Returns an open Bunny::Session object.
-    attr_reader :connection
-
-    # Internal: Returns the name of the RabbitMQ topic exchange.
-    attr_reader :exchange_name
-
     # Internal: Returns the Subscriber actor for this Manager.
     attr_reader :subscriber
 
@@ -54,16 +45,12 @@ module Proletariat
     # Internal: Returns a shared mailbox for the pool of workers.
     attr_reader :workers_mailbox
 
-    # Internal: Returns the number of worker threads in the worker pool.
-    attr_reader :worker_threads
-
     # Internal: Assign a new Subscriber instance (configured for the current
     #           worker type) to the manager's subscriber property.
     #
     # Returns nil.
     def create_subscriber
       @subscriber = Subscriber.new(
-        connection,
         workers_mailbox,
         generate_queue_config
       )
@@ -77,7 +64,8 @@ module Proletariat
     #
     # Returns nil.
     def create_worker_pool
-      @workers_mailbox, @worker_pool = Actor.pool(worker_threads, worker_class)
+      threads = Proletariat.worker_threads
+      @workers_mailbox, @worker_pool = Actor.pool(threads, worker_class)
 
       nil
     end
@@ -87,13 +75,7 @@ module Proletariat
     #
     # Returns a new QueueConfig instance.
     def generate_queue_config
-      QueueConfig.new(
-        worker_class.name,
-        exchange_name,
-        worker_class.routing_keys,
-        worker_threads,
-        false
-      )
+      QueueConfig.new(worker_class.name, worker_class.routing_keys, false)
     end
   end
 end

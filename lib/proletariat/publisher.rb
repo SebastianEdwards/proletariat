@@ -9,9 +9,9 @@ module Proletariat
     #
     # connection    - An open Bunny::Session object.
     # exchange_name - A String of the RabbitMQ topic exchange.
-    def initialize(connection, exchange_name)
-      @channel  = connection.create_channel
-      @exchange = channel.topic(exchange_name, durable: true)
+    def initialize
+      @channel  = Proletariat.connection.create_channel
+      @exchange = channel.topic(Proletariat.exchange_name, durable: true)
     end
 
     # Public: Logs the 'online' status of the publisher.

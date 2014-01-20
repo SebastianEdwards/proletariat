@@ -1,9 +1,5 @@
 # Internal: Value object to hold RabbitMQ settings.
-class QueueConfig < Struct.new(:worker_name,
-                               :exchange_name,
-                               :routing_keys,
-                               :prefetch,
-                               :auto_delete)
+class QueueConfig < Struct.new(:worker_name, :routing_keys, :auto_delete)
   # Public: Create an underscored RabbitMQ queue name from the worker_name.
   #
   # Examples

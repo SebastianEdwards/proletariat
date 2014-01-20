@@ -11,16 +11,15 @@ module Proletariat
     # connection    - An open Bunny::Session object.
     # exchange_name - A String of the RabbitMQ topic exchange.
     # queue_config  - A QueueConfig value object.
-    def initialize(connection, listener, queue_config)
-      @connection   = connection
+    def initialize(listener, queue_config)
       @listener     = listener
       @queue_config = queue_config
 
-      @channel      = @connection.create_channel
+      @channel      = Proletariat.connection.create_channel
 
-      @channel.prefetch queue_config.prefetch
+      @channel.prefetch Proletariat.worker_threads
 
-      @exchange     = @channel.topic queue_config.exchange_name, durable: true
+      @exchange     = @channel.topic Proletariat.exchange_name, durable: true
       @bunny_queue  = @channel.queue queue_config.queue_name,
                                      durable: true,
                                      auto_delete: queue_config.auto_delete
