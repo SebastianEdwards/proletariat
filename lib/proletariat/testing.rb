@@ -4,7 +4,7 @@ require 'proletariat/testing/fixnum_extension'
 
 module Proletariat
   # Public: Mixin to aid solve test synchronization issues while still running
-  #         Proletariat the same way you would in production,
+  #         Proletariat the same way you would in production.
   module Testing
     # Public: Builds an Expectation instance which listens for a single message
     #         on any topic.
