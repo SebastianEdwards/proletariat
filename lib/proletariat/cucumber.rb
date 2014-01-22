@@ -4,8 +4,10 @@ require 'proletariat/testing'
 World(Proletariat::Testing)
 
 # Hide logs by default.
-AfterConfiguration do |config|
-  Proletariat.logger = Logger.new('/dev/null')
+AfterConfiguration do |_|
+  Proletariat.configure do
+    config.logger = Logger.new('/dev/null')
+  end
 end
 
 # Ensure Proletariat running before each test.

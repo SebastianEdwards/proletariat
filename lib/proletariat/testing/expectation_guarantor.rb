@@ -19,7 +19,6 @@ module Proletariat
       # block        - The block of code within which the expectations should
       #                be satisfied.
       def initialize(expectations, &block)
-        @connection  = Proletariat.runner.connection
         @counters    = []
         @subscribers = []
 
@@ -27,7 +26,7 @@ module Proletariat
           queue_config = generate_queue_config_for_topic(expectation.topics)
           counter = MessageCounter.new(expectation.quantity)
           counters << counter
-          subscribers << Subscriber.new(connection, counter, queue_config)
+          subscribers << Subscriber.new(counter, queue_config)
         end
 
         @block = block
@@ -61,9 +60,6 @@ module Proletariat
       #           satisfied.
       attr_reader :block
 
-      # Internal: Returns an open Bunny::Session object.
-      attr_reader :connection
-
       # Internal: Returns an array of MessageCounter instances.
       attr_reader :counters
 
@@ -71,7 +67,7 @@ module Proletariat
       attr_reader :subscribers
 
       def generate_queue_config_for_topic(topics)
-        QueueConfig.new('', Proletariat.runner.exchange_name, topics, 1, true)
+        QueueConfig.new('', topics, true)
       end
 
       # Internal: Checks each counter to ensure expected messages have arrived.
