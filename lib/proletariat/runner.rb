@@ -9,9 +9,8 @@ module Proletariat
 
     # Public: Creates a new Runner instance.
     def initialize
-      @supervisor = create_supervisor
-
-      @managers = []
+      @supervisor = Concurrent::Supervisor.new
+      @managers   = []
 
       create_publisher_pool
 
@@ -71,7 +70,7 @@ module Proletariat
     # Returns nil.
     def add_workers_to_supervisor
       Proletariat.worker_classes.each do |worker_class|
-        manager = create_manager(worker_class)
+        manager = Manager.new(worker_class)
         @managers << manager
         supervisor.add_worker manager
       end
@@ -87,21 +86,6 @@ module Proletariat
     def create_publisher_pool
       threads = Proletariat.publisher_threads
       @publishers_mailbox, @publisher_pool = Actor.pool(threads, Publisher)
-    end
-
-    # Internal: Creates a new Concurrent::Supervisor.
-    #
-    # Returns a Concurrent::Supervisor instance.
-    def create_supervisor
-      Concurrent::Supervisor.new
-    end
-
-    # Internal: Creates a Manager for a given Worker subclass adding relevant
-    #           arguments from Runner properties.
-    #
-    # Returns a Manager instance.
-    def create_manager(worker_class)
-      Manager.new(worker_class)
     end
   end
 end
