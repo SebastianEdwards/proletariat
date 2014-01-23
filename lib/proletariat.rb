@@ -6,6 +6,7 @@ require 'logger'
 require 'forwardable'
 
 require 'proletariat/concurrency/actor'
+require 'proletariat/concurrency/supervisor'
 
 require 'proletariat/util/worker_description_parser'
 

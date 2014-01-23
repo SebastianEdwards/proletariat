@@ -9,13 +9,14 @@ module Proletariat
 
     # Public: Creates a new Runner instance.
     def initialize
-      @supervisor = Concurrent::Supervisor.new
-      @managers   = []
+      @supervisor = Supervisor.new
+      @managers   = Proletariat.worker_classes.map do |worker_class|
+        Manager.new(worker_class)
+      end
 
-      create_publisher_pool
-
-      add_publishers_to_supervisor
-      add_workers_to_supervisor
+      supervisor.supervise_pool('publishers', Proletariat.publisher_threads,
+                                Publisher)
+      managers.each { |manager| supervisor.add_supervisor manager }
     end
 
     # Public: Publishes a message to RabbitMQ via the publisher pool.
@@ -27,7 +28,7 @@ module Proletariat
     #
     # Returns nil.
     def publish(to, message)
-      publishers_mailbox.post to, message
+      supervisor['publishers'].post to, message
 
       nil
     end
@@ -46,46 +47,7 @@ module Proletariat
     # Internal: Returns an Array of the currently supervised Managers.
     attr_reader :managers
 
-    # Internal: Returns the pool of initialized publishers.
-    attr_reader :publisher_pool
-
-    # Internal: Returns a shared mailbox for the pool of publishers.
-    attr_reader :publishers_mailbox
-
     # Internal: Returns the supervisor instance.
     attr_reader :supervisor
-
-    # Internal: Adds each publisher in the publisher_pool to the supervisor.
-    #
-    # Returns nil.
-    def add_publishers_to_supervisor
-      publisher_pool.each { |publisher| supervisor.add_worker publisher }
-
-      nil
-    end
-
-    # Internal: Creates a Manager per worker_class and adds these to the
-    #           supervisor.
-    #
-    # Returns nil.
-    def add_workers_to_supervisor
-      Proletariat.worker_classes.each do |worker_class|
-        manager = Manager.new(worker_class)
-        @managers << manager
-        supervisor.add_worker manager
-      end
-
-      nil
-    end
-
-    # Internal: Assign new Concurrent::Poolbox and Array[Publisher] to the
-    #           manager's publishers_mailbox and publisher_pool properties
-    #           respectively.
-    #
-    # Returns nil.
-    def create_publisher_pool
-      threads = Proletariat.publisher_threads
-      @publishers_mailbox, @publisher_pool = Actor.pool(threads, Publisher)
-    end
   end
 end

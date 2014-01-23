@@ -2,20 +2,26 @@ module Proletariat
   # Public: Maintains a pool of worker threads and a RabbitMQ subscriber
   #         thread. Uses information from the worker class to generate queue
   #         config.
-  class Manager < Concurrent::Supervisor
+  class Manager
     # Public: Creates a new Manager instance.
     #
     # worker_class  - A subclass of Proletariat::Worker to handle messages.
     def initialize(worker_class)
-      super()
+      @supervisor = Supervisor.new
 
-      @worker_class   = worker_class
+      supervisor.supervise_pool('workers', Proletariat.worker_threads,
+                                worker_class)
 
-      create_worker_pool
-      create_subscriber
+      @subscriber = Subscriber.new(supervisor['workers'],
+                                   generate_queue_config(worker_class))
 
-      worker_pool.each { |worker| add_worker worker }
-      add_worker subscriber
+      supervisor.add_worker subscriber
+    end
+
+    # Delegate lifecycle calls to supervisor. Cannot use Forwardable due to
+    # concurrent-ruby API checking implementation.
+    %w(run stop running?).each do |method|
+      define_method(method) { supervisor.send method }
     end
 
     # Public: Purge the RabbitMQ queue.
@@ -32,45 +38,15 @@ module Proletariat
     # Internal: Returns the Subscriber actor for this Manager.
     attr_reader :subscriber
 
-    # Internal: Returns the subclass of Worker used to process messages.
-    attr_reader :worker_class
+    # Internal: The supervisor used to manage the Workers and Subscriber
+    attr_reader :supervisor
 
-    # Internal: Returns the pool of initialized workers.
-    attr_reader :worker_pool
-
-    # Internal: Returns a shared mailbox for the pool of workers.
-    attr_reader :workers_mailbox
-
-    # Internal: Assign a new Subscriber instance (configured for the current
-    #           worker type) to the manager's subscriber property.
+    # Internal: Builds a new QueueConfig from a given Worker subclass.
     #
-    # Returns nil.
-    def create_subscriber
-      @subscriber = Subscriber.new(
-        workers_mailbox,
-        generate_queue_config
-      )
-
-      nil
-    end
-
-    # Internal: Assign new Concurrent::Poolbox and Array[Worker] to the
-    #           manager's workers_mailbox and worker_pool properties
-    #           respectively.
-    #
-    # Returns nil.
-    def create_worker_pool
-      threads = Proletariat.worker_threads
-      @workers_mailbox, @worker_pool = Actor.pool(threads, worker_class)
-
-      nil
-    end
-
-    # Internal: Builds a new QueueConfig object passing in some settings from
-    #           worker_class.
+    # worker_class - The Worker subclass to base settings on.
     #
     # Returns a new QueueConfig instance.
-    def generate_queue_config
+    def generate_queue_config(worker_class)
       QueueConfig.new(worker_class.name, worker_class.routing_keys, false)
     end
   end
