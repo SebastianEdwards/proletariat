@@ -8,6 +8,8 @@ AfterConfiguration do |_|
   Proletariat.configure do
     config.logger = Logger.new('/dev/null')
   end
+
+  Proletariat.purge
 end
 
 # Ensure Proletariat running before each test.
