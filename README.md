@@ -100,6 +100,5 @@ Use the provided helpers in your step definitions to synchronize your test suite
 I wanted a library which shared one RabbitMQ connection across all of the workers on a given process. Many hosted RabbitMQ platforms tightly limit the max number of connections.
 
 ## TODO
-- Improve test suite :(
 - Add command line interface
 - Abstract retry strategies
