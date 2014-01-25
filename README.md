@@ -52,7 +52,7 @@ Here's a complete example:
       end
     end
 
-### Select your Workers
+### Running your Workers
 
 Define the `WORKERS` env variable.
 
