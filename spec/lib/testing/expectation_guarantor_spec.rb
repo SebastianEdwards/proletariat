@@ -34,19 +34,19 @@ module Proletariat
 
         it 'should increment the count' do
           counter = ExpectationGuarantor::MessageCounter.new(1)
-          counter.post?('message')
+          counter.post?('message', 'key')
           expect(counter.expected_messages_received?).to be_truthy
         end
 
         it 'should return a future containing :ok' do
           counter = ExpectationGuarantor::MessageCounter.new(1)
           expect(Concurrent::Future).to receive(:new)
-          counter.post?('message')
+          counter.post?('message', 'key')
         end
 
         it 'should ensure the returned future contains :ok' do
           counter = ExpectationGuarantor::MessageCounter.new(1)
-          future = counter.post?('message')
+          future = counter.post?('message', 'key')
           expect(future.block.call).to eq :ok
         end
       end
