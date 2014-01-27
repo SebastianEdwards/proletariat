@@ -122,7 +122,7 @@ module Proletariat
         # message - The contents of the message.
         #
         # Returns a future-like object holding an :ok Symbol.
-        def post?(message)
+        def post?(message, routing_key)
           self.count = count + 1
 
           Concurrent::Future.new { :ok }
