@@ -8,7 +8,7 @@ class PingWorker < Proletariat::Worker
     attr_accessor :pinged
   end
 
-  def work(message)
+  def work(message, routing_key)
     self.class.pinged = true
 
     log 'PING'
@@ -27,7 +27,7 @@ class PongWorker < Proletariat::Worker
     attr_accessor :ponged
   end
 
-  def work(message)
+  def work(message, routing_key)
     self.class.ponged = true
 
     log 'PONG'

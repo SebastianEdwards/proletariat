@@ -38,7 +38,7 @@ module Proletariat
     # message - The incoming message.
     #
     # Raises NotImplementedError unless implemented in subclass.
-    def work(message)
+    def work(message, routing_key)
       fail NotImplementedError
     end
 

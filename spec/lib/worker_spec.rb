@@ -31,7 +31,7 @@ module Proletariat
 
     describe '#work' do
       it 'should raise NotImplementedError' do
-        expect { Worker.new.work('message') }.to \
+        expect { Worker.new.work('message', 'key') }.to \
           raise_exception NotImplementedError
       end
     end
