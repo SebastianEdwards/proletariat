@@ -44,7 +44,7 @@ module Proletariat
 
     def method_missing(method_sym, *arguments, &block)
       if config.respond_to? method_sym
-        config.send method_sym
+        config.send(method_sym, *arguments, &block)
       else
         super
       end
