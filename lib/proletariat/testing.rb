@@ -31,11 +31,12 @@ module Proletariat
     #   # ... [Time passes]
     #   # => MessageTimeoutError
     #
-    # Returns nil.
+    # Returns ExpectationGuarantor.
     def wait_for(*expectations, &block)
-      ExpectationGuarantor.new(expectations, &block).guarantee
+      guarantor = ExpectationGuarantor.new(expectations, &block)
+      guarantor.guarantee if block.present?
 
-      nil
+      guarantor
     end
   end
 end
