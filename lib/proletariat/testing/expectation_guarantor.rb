@@ -30,6 +30,8 @@ module Proletariat
         end
 
         @block = block
+
+        run_subscribers
       end
 
       # Public: Execute the blocks and waits for the expectations to be met.
@@ -37,8 +39,6 @@ module Proletariat
       # Returns nil if expectations are met within timeout.
       # Raises MessageTimeoutError if expectations are not met within timeout.
       def guarantee
-        run_subscribers
-
         block.call if block
 
         timer = 0.0
