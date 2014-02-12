@@ -30,6 +30,7 @@ module Proletariat
         end
 
         @block = block
+        @noop = true if expectations.length == 0
 
         run_subscribers
       end
@@ -41,6 +42,8 @@ module Proletariat
       def guarantee
         block.call if block
 
+        return nil if noop
+
         timer = 0.0
 
         until passed?
@@ -49,9 +52,9 @@ module Proletariat
           timer += MESSAGE_CHECK_INTERVAL
         end
 
-        stop_subscribers
-
         nil
+      ensure
+        stop_subscribers
       end
 
       private
@@ -62,6 +65,9 @@ module Proletariat
 
       # Internal: Returns an array of MessageCounter instances.
       attr_reader :counters
+
+      # Internal: Returns true if there aren't any expectations.
+      attr_reader :noop
 
       # Internal: Returns an array of Subscriber instances.
       attr_reader :subscribers
