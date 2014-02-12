@@ -74,6 +74,7 @@ module Proletariat
     #
     # Returns nil.
     def publish(to, message = '')
+      log "Publishing to: #{to}"
       Proletariat.publish to, message
 
       nil
