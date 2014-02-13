@@ -2,7 +2,7 @@ require 'proletariat/worker'
 
 module Proletariat
   describe Worker do
-    let(:logger) { double }
+    let(:logger) { double.as_null_object }
 
     before do
       allow(Proletariat).to receive(:logger).and_return(logger)
