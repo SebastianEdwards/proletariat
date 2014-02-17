@@ -5,10 +5,10 @@ module Proletariat
     DEFAULT_EXCHANGE_NAME = 'proletariat'
 
     # Public: The default number of threads to use for publishers.
-    DEFAULT_PUBLISHER_THREADS = 2
+    DEFAULT_PUBLISHER_THREADS = ENV['PUBLISHER_THREADS'] || 2
 
     # Public: The default number of threads to use for each worker class.
-    DEFAULT_WORKER_THREADS = 3
+    DEFAULT_WORKER_THREADS = ENV['WORKER_THREADS'] || 3
 
     # Internal: Sets the RabbitMQ connection.
     attr_writer :connection
