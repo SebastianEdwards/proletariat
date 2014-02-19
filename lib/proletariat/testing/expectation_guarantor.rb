@@ -125,10 +125,12 @@ module Proletariat
         # Public: Handles message calls from a subscriber and increments the
         #         count. Return value matches interface expected by Subscriber.
         #
-        # message - The contents of the message.
+        # message     - The contents of the message.
+        # routing_key - Routing key for messages.
+        # headers     - Hash of message headers.
         #
         # Returns a future-like object holding an :ok Symbol.
-        def post?(message, routing_key)
+        def post?(message, routing_key, headers)
           self.count = count + 1
 
           Concurrent::Future.new { :ok }

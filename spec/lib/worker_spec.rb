@@ -31,7 +31,7 @@ module Proletariat
 
     describe '#work' do
       it 'should raise NotImplementedError' do
-        expect { Worker.new.work('message', 'key') }.to \
+        expect { Worker.new.work('message', 'key', {}) }.to \
           raise_exception NotImplementedError
       end
     end
@@ -53,12 +53,12 @@ module Proletariat
 
     describe '#publish' do
       it 'should forward the message to the publisher' do
-        expect(Proletariat).to receive(:publish).with('topic', 'message')
-        Worker.new.publish 'topic', 'message'
+        expect(Proletariat).to receive(:publish).with('topic', 'message', {})
+        Worker.new.publish 'topic', 'message', {}
       end
 
       it 'should have a blank default message' do
-        expect(Proletariat).to receive(:publish).with('topic', '')
+        expect(Proletariat).to receive(:publish).with('topic', '', {})
         Worker.new.publish 'topic'
       end
     end

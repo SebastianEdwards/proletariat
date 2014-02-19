@@ -44,10 +44,12 @@ module Proletariat
     #           with the RabbitMQ convention you can use the '*' character to
     #           replace one word and the '#' to replace many words.
     # message - The message as a String.
+    # headers - Hash of message headers.
     #
     # Returns nil.
-    def work(to, message)
-      exchange.publish message, routing_key: to, persistent: true
+    def work(to, message, headers)
+      exchange.publish message, routing_key: to, persistent: true,
+                                headers: headers
 
       nil
     end

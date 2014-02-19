@@ -117,7 +117,7 @@ module Proletariat
     # Returns nil.
     def start_consumer
       @consumer = bunny_queue.subscribe ack: true do |info, properties, body|
-        future = listener.post?(body, info.routing_key)
+        future = listener.post?(body, info.routing_key, properties.headers)
         acknowledgers << Acknowledger.new(future, info.delivery_tag)
 
         nil

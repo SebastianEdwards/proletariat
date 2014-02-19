@@ -38,7 +38,7 @@ module Proletariat
     # message - The incoming message.
     #
     # Raises NotImplementedError unless implemented in subclass.
-    def work(message, routing_key)
+    def work(message, routing_key, headers)
       fail NotImplementedError
     end
 
@@ -71,11 +71,12 @@ module Proletariat
     #           with the RabbitMQ convention you can use the '*' character to
     #           replace one word and the '#' to replace many words.
     # message - The message as a String.
+    # headers - Hash of message headers.
     #
     # Returns nil.
-    def publish(to, message = '')
+    def publish(to, message = '', headers = {})
       log "Publishing to: #{to}"
-      Proletariat.publish to, message
+      Proletariat.publish to, message, headers
 
       nil
     end
