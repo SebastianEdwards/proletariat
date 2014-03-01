@@ -1,3 +1,10 @@
+## 0.0.5
+
+Features:
+
+  - Added access to message headers in #work (breaking change).
+  - Added exponential back-off for failing workers.
+
 ## 0.0.4
 
 Features:

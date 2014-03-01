@@ -41,7 +41,7 @@ Here's a complete example:
     class SendUserIntroductoryEmail < Proletariat::Worker
       listen_on 'user.created'
 
-      def work(message, key)
+      def work(message, key, headers)
         params = JSON.parse(message)
 
         UserMailer.introductory_email(params).deliver!
