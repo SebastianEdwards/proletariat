@@ -111,6 +111,32 @@ module Proletariat
       scheduled_retries.select { |r| r.requeued? }
     end
 
+    # Internal: Forwards all message bodies to listener#post. Auto-acks
+    #           messages not meant for this subscriber's workers.
+    #
+    # Returns nil.
+    def handle_message(info, properties, body)
+      if handles_worker_type? properties.headers['worker']
+        future = listener.post?(body, info.routing_key, properties.headers)
+        acknowledgers << Acknowledger.new(future, info.delivery_tag, {
+          message: body, key: info.routing_key, headers: properties.headers,
+          worker:  queue_config.queue_name }, scheduled_retries)
+      else
+        channel.acknowledge info.delivery_tag
+      end
+
+      nil
+    end
+
+    # Internal: Checks if subscriber should handle message for given worker
+    #           header.
+    #
+    # Returns true if should be handled or header is nil.
+    # Returns false if should not be handled.
+    def handles_worker_type?(worker_header)
+      [nil, queue_config.queue_name].include? worker_header
+    end
+
     # Internal: Get acknowledgers for messages whose work has completed.
     #
     # Returns an Array of Acknowledgers.
@@ -125,17 +151,13 @@ module Proletariat
     end
 
     # Internal: Starts a consumer on the queue. The consumer forwards all
-    #           message bodies to listener#post.
+    #           message bodies to listener#post. Auto-acks messages not meant
+    #           for this subscriber's workers.
     #
     # Returns nil.
     def start_consumer
       @consumer = bunny_queue.subscribe ack: true do |info, properties, body|
-        future = listener.post?(body, info.routing_key, properties.headers)
-        acknowledgers << Acknowledger.new(future, info.delivery_tag, {
-          message: body,
-          key: info.routing_key,
-          headers: properties.headers
-        }, scheduled_retries)
+        handle_message info, properties, body
 
         nil
       end
@@ -255,28 +277,10 @@ module Proletariat
       def acknowledge_error(channel)
         Proletariat.logger.error future.reason
 
-        properties[:headers]['failures'] = current_failures + 1
-        scheduled_retries << Retry.new(retry_delay, properties)
-
+        scheduled_retries << Retry.new(properties)
         channel.acknowledge delivery_tag
 
         nil
-      end
-
-      # Internal: Fetches the current number of message failures from the
-      #           headers. Defaults to 0.
-      #
-      # Returns a Fixnum.
-      def current_failures
-        properties[:headers]['failures'] || 0
-      end
-
-      # Internal: Calculates an exponential retry delay based on the previous
-      #           number of failures. Capped at MAX_RETRY_DELAY.
-      #
-      # Returns the delay in seconds as a Fixnum.
-      def retry_delay
-        [2 ** current_failures, Proletariat.max_retry_delay].min
       end
 
       # Internal: Returns the RabbitMQ delivery tag.
@@ -291,9 +295,18 @@ module Proletariat
       # Internal: Returns the Array of Retrys.
       attr_reader :scheduled_retries
 
+      # Internal: Used publish an exponential delayed requeue for failures.
       class Retry
-        def initialize(retry_delay, properties)
-          @properties     = properties
+        # Public: Creates a new Retry instance. Sets appropriate headers for
+        #         requeue message.
+        #
+        # properties - The original message properties.
+        def initialize(properties)
+          @properties = properties
+
+          properties[:headers]['failures'] = failures
+          properties[:headers]['worker']   = properties[:worker]
+
           @scheduled_task = Concurrent::ScheduledTask.new(retry_delay) do
             requeue_message
           end
@@ -328,12 +341,30 @@ module Proletariat
         # Internal: Returns the ScheduledTask which will requeue the message.
         attr_reader :scheduled_task
 
+        # Internal: Fetches the current number of message failures from the
+        #           headers. Defaults to 1.
+        #
+        # Returns a Fixnum.
+        def failures
+          @failures ||= (properties[:headers]['failures'] || 0) + 1
+        end
+
         # Internal: Performs the actual message requeue.
+        #
+        # Returns nil.
         def requeue_message
           Proletariat.publish(properties[:key], properties[:message],
                               properties[:headers])
 
           nil
+        end
+
+        # Internal: Calculates an exponential retry delay based on the previous
+        #           number of failures. Capped with configuration setting.
+        #
+        # Returns the delay in seconds as a Fixnum.
+        def retry_delay
+          [2**failures, Proletariat.max_retry_delay].min
         end
       end
     end
