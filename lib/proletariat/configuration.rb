@@ -4,6 +4,9 @@ module Proletariat
     # Public: The default name used for the RabbitMQ topic exchange.
     DEFAULT_EXCHANGE_NAME = 'proletariat'
 
+    # Public: The default maximum seconds to delay a failed job requeue.
+    DEFAULT_MAX_RETRY_DELAY = (ENV['MAX_RETRY_DELAY'] || 60).to_i
+
     # Public: The default number of threads to use for publishers.
     DEFAULT_PUBLISHER_THREADS = (ENV['PUBLISHER_THREADS'] || 2).to_i
 
@@ -18,6 +21,9 @@ module Proletariat
 
     # Internal: Sets the logger.
     attr_writer :logger
+
+    # Internal: Sets the maximum seconds to delay a failed job requeue.
+    attr_writer :max_retry_delay
 
     # Internal: Sets the number of threads to use for publishers.
     attr_writer :publisher_threads
@@ -65,6 +71,13 @@ module Proletariat
     # Returns a logger.
     def logger
       @logger ||= Logger.new(STDOUT)
+    end
+
+    # Public: Returns the set max delay seconds or a default.
+    #
+    # Returns a Fixnum.
+    def max_retry_delay
+      @max_retry_delay ||= DEFAULT_MAX_RETRY_DELAY
     end
 
     # Public: Returns the set number of publisher threads or a default.

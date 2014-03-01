@@ -58,6 +58,8 @@ module Proletariat
         acknowledger.acknowledge_on_channel channel
         acknowledgers.delete acknowledger
       end
+
+      completed_retries.each { |r| scheduled_retries.delete r }
     end
 
     # Public: Purge the RabbitMQ queue.
@@ -102,6 +104,13 @@ module Proletariat
       nil
     end
 
+    # Internal: Get scheduled retries whose messages have been requeued.
+    #
+    # Returns an Array of Retrys.
+    def completed_retries
+      scheduled_retries.select { |r| r.requeued? }
+    end
+
     # Internal: Get acknowledgers for messages whose work has completed.
     #
     # Returns an Array of Acknowledgers.
@@ -111,6 +120,10 @@ module Proletariat
       end
     end
 
+    def scheduled_retries
+      @scheduled_retries ||= []
+    end
+
     # Internal: Starts a consumer on the queue. The consumer forwards all
     #           message bodies to listener#post.
     #
@@ -118,7 +131,11 @@ module Proletariat
     def start_consumer
       @consumer = bunny_queue.subscribe ack: true do |info, properties, body|
         future = listener.post?(body, info.routing_key, properties.headers)
-        acknowledgers << Acknowledger.new(future, info.delivery_tag)
+        acknowledgers << Acknowledger.new(future, info.delivery_tag, {
+          message: body,
+          key: info.routing_key,
+          headers: properties.headers
+        }, scheduled_retries)
 
         nil
       end
@@ -133,6 +150,7 @@ module Proletariat
     def stop_consumer
       @consumer.cancel if @consumer
       wait_for_acknowledgers if acknowledgers.any?
+      scheduled_retries.each { |r| r.expedite }
 
       nil
     end
@@ -160,11 +178,15 @@ module Proletariat
 
       # Public: Creates a new Acknowledger instance.
       #
-      # future       - A future-like object holding the Worker response.
-      # delivery_tag - The RabbitMQ delivery tag to be used when ack/nacking.
-      def initialize(future, delivery_tag)
-        @future       = future
-        @delivery_tag = delivery_tag
+      # future            - A future-like object holding the Worker response.
+      # delivery_tag      - The RabbitMQ delivery tag for ack/nacking.
+      # properties        - The original message properties; for requeuing.
+      # scheduled_retries - An Array to hold any created Retrys.
+      def initialize(future, delivery_tag, properties, scheduled_retries)
+        @future            = future
+        @delivery_tag      = delivery_tag
+        @properties        = properties
+        @scheduled_retries = scheduled_retries
       end
 
       # Public: Retrieves the value from the future and sends the relevant
@@ -232,9 +254,29 @@ module Proletariat
       # Returns nil.
       def acknowledge_error(channel)
         Proletariat.logger.error future.reason
-        channel.reject delivery_tag, true
+
+        properties[:headers]['failures'] = current_failures + 1
+        scheduled_retries << Retry.new(retry_delay, properties)
+
+        channel.acknowledge delivery_tag
 
         nil
+      end
+
+      # Internal: Fetches the current number of message failures from the
+      #           headers. Defaults to 0.
+      #
+      # Returns a Fixnum.
+      def current_failures
+        properties[:headers]['failures'] || 0
+      end
+
+      # Internal: Calculates an exponential retry delay based on the previous
+      #           number of failures. Capped at MAX_RETRY_DELAY.
+      #
+      # Returns the delay in seconds as a Fixnum.
+      def retry_delay
+        [2 ** current_failures, Proletariat.max_retry_delay].min
       end
 
       # Internal: Returns the RabbitMQ delivery tag.
@@ -242,6 +284,58 @@ module Proletariat
 
       # Internal: Returns the future-like object holding the Worker response.
       attr_reader :future
+
+      # Internal: Returns the original message properties.
+      attr_reader :properties
+
+      # Internal: Returns the Array of Retrys.
+      attr_reader :scheduled_retries
+
+      class Retry
+        def initialize(retry_delay, properties)
+          @properties     = properties
+          @scheduled_task = Concurrent::ScheduledTask.new(retry_delay) do
+            requeue_message
+          end
+        end
+
+        # Public: Attempt to requeue the message immediately if pending or
+        #         wait for natural completion.
+        #
+        # Returns nil.
+        def expedite
+          if scheduled_task.cancel
+            requeue_message
+          else
+            scheduled_task.value
+          end
+
+          nil
+        end
+
+        # Public: Tests whether the message has been requeued.
+        #
+        # Returns a Boolean.
+        def requeued?
+          scheduled_task.fulfilled?
+        end
+
+        private
+
+        # Internal: Returns the original message properties.
+        attr_reader :properties
+
+        # Internal: Returns the ScheduledTask which will requeue the message.
+        attr_reader :scheduled_task
+
+        # Internal: Performs the actual message requeue.
+        def requeue_message
+          Proletariat.publish(properties[:key], properties[:message],
+                              properties[:headers])
+
+          nil
+        end
+      end
     end
   end
 end
