@@ -310,6 +310,8 @@ module Proletariat
           @scheduled_task = Concurrent::ScheduledTask.new(retry_delay) do
             requeue_message
           end
+
+          @scheduled_task.execute
         end
 
         # Public: Attempt to requeue the message immediately if pending or

@@ -19,6 +19,6 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'rspec', '3.0.0.beta1'
   s.add_development_dependency 'rubocop'
 
-  s.add_runtime_dependency 'concurrent-ruby', '~> 0.4.0'
+  s.add_runtime_dependency 'concurrent-ruby', '~> 0.6.1'
   s.add_runtime_dependency 'bunny', '~> 1.1.0'
 end
