@@ -3,43 +3,14 @@ require 'proletariat/concerns/logging'
 module Proletariat
   # Public: Handles messages for Background processing. Subclasses should
   #         overwrite the #work method.
-  class Worker
+  class Worker < PoolableActor
     include Concerns::Logging
 
-    # Public: Logs the 'online' status of the worker.
+    # Internal: Handles the Actor mailbox. Delegates work to #work.
     #
-    # Returns nil.
-    def started
-      log_info 'Now online'
-
-      nil
-    end
-
-    # Public: Logs the 'offline' status of the worker.
-    #
-    # Returns nil.
-    def stopped
-      log_info 'Now offline'
-
-      nil
-    end
-
-    # Public: Logs the 'shutting down' status of the worker.
-    #
-    # Returns nil.
-    def stopping
-      log_info 'Attempting graceful shutdown.'
-
-      nil
-    end
-
-    # Public: Handles an incoming message to perform background work.
-    #
-    # message - The incoming message.
-    #
-    # Raises NotImplementedError unless implemented in subclass.
-    def work(message, routing_key, headers)
-      fail NotImplementedError
+    # message - A Message to send.
+    def actor_work(message)
+      work message.body, message.to, message.headers if message.is_a?(Message)
     end
 
     # Public: Helper method to ease accessing the logger from within #work.
@@ -79,6 +50,38 @@ module Proletariat
       Proletariat.publish to, message, headers
 
       nil
+    end
+
+    # Public: Logs the 'online' status of the worker.
+    #
+    # Returns nil.
+    def started
+      log_info 'Now online'
+
+      nil
+    end
+
+    # Public: Logs the 'offline' status of the worker.
+    #
+    # Returns nil.
+    def stopped
+      log_info 'Now offline'
+
+      nil
+    end
+
+    # Public: Handles an incoming message to perform background work.
+    #
+    # message - The incoming message.
+    #
+    # Raises NotImplementedError unless implemented in subclass.
+    def work(message, routing_key, headers)
+      fail NotImplementedError
+    end
+
+    # Public: Use #actor_work to handle the actor mailbox.
+    def work_method
+      :actor_work
     end
 
     # Internal: Class methods on Worker to provide configuration DSL.

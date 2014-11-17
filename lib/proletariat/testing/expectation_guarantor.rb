@@ -22,17 +22,15 @@ module Proletariat
         @counters    = []
         @subscribers = []
 
-        expectations.each do |expectation|
+        expectations.each_with_index do |expectation, i|
           queue_config = generate_queue_config_for_topic(expectation.topics)
-          counter = MessageCounter.new(expectation.quantity)
+          suffix = "_#{i}_#{object_id}"
+          counter = MessageCounter.spawn!("c#{suffix}", expectation.quantity)
           counters << counter
-          subscribers << Subscriber.new(counter, queue_config)
+          subscribers << Subscriber.spawn!("s#{suffix}", counter, queue_config)
         end
 
         @block = block
-        @noop = true if expectations.length == 0
-
-        run_subscribers
       end
 
       # Public: Execute the blocks and waits for the expectations to be met.
@@ -44,13 +42,7 @@ module Proletariat
 
         return nil if noop
 
-        timer = 0.0
-
-        until passed?
-          fail MessageTimeoutError if timer > MESSAGE_TIMEOUT
-          sleep MESSAGE_CHECK_INTERVAL
-          timer += MESSAGE_CHECK_INTERVAL
-        end
+        wait!
 
         nil
       ensure
@@ -66,9 +58,6 @@ module Proletariat
       # Internal: Returns an array of MessageCounter instances.
       attr_reader :counters
 
-      # Internal: Returns true if there aren't any expectations.
-      attr_reader :noop
-
       # Internal: Returns an array of Subscriber instances.
       attr_reader :subscribers
 
@@ -82,30 +71,43 @@ module Proletariat
       # Returns false if one or more counters are not satisfied.
       def passed?
         counters
-          .map(&:expected_messages_received?)
+          .map { |c| c.ask!(:expected_messages_received?) }
           .reduce { |a, e| a && e }
       end
 
-      # Internal: Starts each subscriber.
-      #
-      # Returns nil.
-      def run_subscribers
-        subscribers.each { |subscriber| subscriber.run! }
-
-        nil
+      # Internal: Returns true if there aren't any expectations.
+      def noop
+        subscribers.length == 0
       end
 
       # Internal: Stops each subscriber.
       #
       # Returns nil.
       def stop_subscribers
-        subscribers.each { |subscriber| subscriber.stop }
+        subscribers.each { |subscriber| subscriber << :terminate! }
+
+        nil
+      end
+
+      # Internal: Sleeps the thread at regular intervals until the expectation
+      #           is passed.
+      #
+      # Returns nil if expectation passes within timeout.
+      # Raises MessageTimeoutError if expectation does not pass within timeout.
+      def wait!
+        timer = 0.0
+
+        until passed?
+          fail MessageTimeoutError if timer > MESSAGE_TIMEOUT
+          sleep MESSAGE_CHECK_INTERVAL
+          timer += MESSAGE_CHECK_INTERVAL
+        end
 
         nil
       end
 
       # Internal: Counts incoming messages to test expection satisfaction.
-      class MessageCounter
+      class MessageCounter < Actor
         # Public: Creates a new MessageCounter instance.
         #
         # expected - The number of messages expected.
@@ -130,10 +132,14 @@ module Proletariat
         # headers     - Hash of message headers.
         #
         # Returns a future-like object holding an :ok Symbol.
-        def post?(message, routing_key, headers)
-          self.count = count + 1
+        def work(message)
+          if message.is_a?(Message)
+            self.count = count + 1
 
-          Concurrent::Future.new { :ok }
+            Concurrent::IVar.new(:ok)
+          else
+            expected_messages_received?
+          end
         end
 
         private

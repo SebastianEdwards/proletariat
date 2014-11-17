@@ -2,35 +2,18 @@ module Proletariat
   # Public: Maintains a pool of worker threads and a RabbitMQ subscriber
   #         thread. Uses information from the worker class to generate queue
   #         config.
-  class Manager
+  class Manager < Concurrent::Actor::RestartingContext
     # Public: Creates a new Manager instance.
     #
     # worker_class  - A subclass of Proletariat::Worker to handle messages.
     def initialize(worker_class)
-      @supervisor = Supervisor.new
+      @workers = worker_class.pool(Proletariat.worker_threads, object_id)
 
-      supervisor.supervise_pool('workers', Proletariat.worker_threads,
-                                worker_class)
-
-      @subscriber = Subscriber.new(supervisor['workers'],
-                                   generate_queue_config(worker_class))
-
-      supervisor.add_worker subscriber
-    end
-
-    # Delegate lifecycle calls to supervisor. Cannot use Forwardable due to
-    # concurrent-ruby API checking implementation.
-    %w(run stop running?).each do |method|
-      define_method(method) { supervisor.send method }
-    end
-
-    # Public: Purge the RabbitMQ queue.
-    #
-    # Returns nil.
-    def purge
-      subscriber.purge
-
-      nil
+      @subscriber = Subscriber.spawn!(
+        name: "#{worker_class.to_s}_subscriber_#{object_id}",
+        supervise: true,
+        args: [workers, generate_queue_config(worker_class)]
+      )
     end
 
     private
@@ -38,8 +21,8 @@ module Proletariat
     # Internal: Returns the Subscriber actor for this Manager.
     attr_reader :subscriber
 
-    # Internal: The supervisor used to manage the Workers and Subscriber
-    attr_reader :supervisor
+    # Internal: Returns an Array of Worker actors.
+    attr_reader :workers
 
     # Internal: Builds a new QueueConfig from a given Worker subclass.
     #
@@ -47,7 +30,8 @@ module Proletariat
     #
     # Returns a new QueueConfig instance.
     def generate_queue_config(worker_class)
-      QueueConfig.new(worker_class.name, worker_class.routing_keys, false)
+      QueueConfig.new(worker_class.name, worker_class.routing_keys,
+                      Proletariat.test_mode?)
     end
   end
 end

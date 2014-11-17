@@ -1,8 +1,13 @@
+require 'concurrent'
+require 'proletariat/concurrency/actor_common'
+require 'proletariat/concurrency/poolable_actor'
 require 'proletariat/worker'
 
 module Proletariat
   describe Worker do
-    let(:logger) { double.as_null_object }
+    let(:balancer) { double.as_null_object }
+    let(:logger)   { double.as_null_object }
+    let(:worker)   { Worker.new(balancer) }
 
     before do
       allow(Proletariat).to receive(:logger).and_return(logger)
@@ -11,27 +16,20 @@ module Proletariat
     describe '#started' do
       it 'should log status' do
         expect(logger).to receive(:info).with /online/
-        Worker.new.started
+        worker.started
       end
     end
 
     describe '#stopped' do
       it 'should log status' do
         expect(logger).to receive(:info).with /offline/
-        Worker.new.stopped
-      end
-    end
-
-    describe '#stopping' do
-      it 'should log status' do
-        expect(logger).to receive(:info).with /graceful shutdown/
-        Worker.new.stopping
+        worker.stopped
       end
     end
 
     describe '#work' do
       it 'should raise NotImplementedError' do
-        expect { Worker.new.work('message', 'key', {}) }.to \
+        expect { worker.work('message', 'key', {}) }.to \
           raise_exception NotImplementedError
       end
     end
@@ -40,13 +38,13 @@ module Proletariat
       context 'when message is provided' do
         it 'should log the message directly' do
           expect(logger).to receive(:info).with 'message to log'
-          Worker.new.log 'message to log'
+          worker.log 'message to log'
         end
       end
 
       context 'when no message is provided' do
         it 'should return the logger instance' do
-          expect(Worker.new.log).to eq logger
+          expect(worker.log).to eq logger
         end
       end
     end
@@ -54,12 +52,12 @@ module Proletariat
     describe '#publish' do
       it 'should forward the message to the publisher' do
         expect(Proletariat).to receive(:publish).with('topic', 'message', {})
-        Worker.new.publish 'topic', 'message', {}
+        worker.publish 'topic', 'message', {}
       end
 
       it 'should have a blank default message' do
         expect(Proletariat).to receive(:publish).with('topic', '', {})
-        Worker.new.publish 'topic'
+        worker.publish 'topic'
       end
     end
 

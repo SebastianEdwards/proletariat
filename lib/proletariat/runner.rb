@@ -4,41 +4,32 @@ module Proletariat
   class Runner
     extend Forwardable
 
-    # Public: Delegate lifecycle calls to the supervisor.
-    def_delegators :supervisor, :run, :run!, :stop, :running?
-
-    # Public: Creates a new Runner instance.
-    def initialize
-      @supervisor = Supervisor.new
-      @managers   = Proletariat.worker_classes.map do |worker_class|
-        Manager.new(worker_class)
-      end
-
-      supervisor.supervise_pool('publishers', Proletariat.publisher_threads,
-                                Publisher)
-      managers.each { |manager| supervisor.add_supervisor manager }
-    end
-
-    # Public: Publishes a message to RabbitMQ via the publisher pool.
-    #
-    # to      - The routing key for the message to as a String. In accordance
-    #           with the RabbitMQ convention you can use the '*' character to
-    #           replace one word and the '#' to replace many words.
-    # message - The message as a String.
-    # headers - Hash of message headers.
+    # Public: Start the workers.
     #
     # Returns nil.
-    def publish(to, message = '', headers = {})
-      supervisor['publishers'].post to, message, headers
+    def run
+      @managers = Proletariat.worker_classes.map do |worker_class|
+        Manager.spawn!(name: "manager_#{worker_class.to_s}_#{object_id}",
+                       supervise: true,
+                       args: [worker_class])
+      end
+
+      managers.each { |manager| manager << :run }
 
       nil
     end
 
-    # Public: Purge the RabbitMQ queues.
+    # Public: Check whether the workers are currently running.
+    def running?
+      !!managers
+    end
+
+    # Public: Stop the workers.
     #
     # Returns nil.
-    def purge
-      managers.each { |manager| manager.purge }
+    def stop
+      managers.each { |manager| manager << :terminate! } if managers
+      @managers = nil
 
       nil
     end
@@ -47,8 +38,5 @@ module Proletariat
 
     # Internal: Returns an Array of the currently supervised Managers.
     attr_reader :managers
-
-    # Internal: Returns the supervisor instance.
-    attr_reader :supervisor
   end
 end

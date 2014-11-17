@@ -87,6 +87,21 @@ module Proletariat
       @publisher_threads ||= DEFAULT_PUBLISHER_THREADS
     end
 
+    # Public: Enables test mode. Queues will auto-delete after use.
+    #
+    # Returns nil.
+    def test_mode!
+      @test_mode = true
+    end
+
+    # Public: Returns whether test mode is enabled or not.
+    #
+    # Returns true if test mode enabled.
+    # Returns false if test mode disabled.
+    def test_mode?
+      !!@test_mode
+    end
+
     # Public: Returns the set worker classes or a default pulled from the
     #         WORKERS env variable.
     #

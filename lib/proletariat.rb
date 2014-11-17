@@ -6,12 +6,13 @@ require 'logger'
 require 'forwardable'
 
 require 'proletariat/concurrency/actor'
-require 'proletariat/concurrency/supervisor'
+require 'proletariat/concurrency/poolable_actor'
 
 require 'proletariat/util/worker_description_parser'
 
 require 'proletariat/configuration'
 require 'proletariat/manager'
+require 'proletariat/message'
 require 'proletariat/publisher'
 require 'proletariat/queue_config'
 require 'proletariat/runner'
@@ -25,7 +26,7 @@ module Proletariat
     extend Forwardable
 
     # Public: Delegate lifecycle calls to the process-wide Runner.
-    def_delegators :runner, :run, :run!, :stop, :running?, :publish, :purge
+    def_delegators :runner, :run, :running?, :stop
 
     # Public: Allows configuration of Proletariat via given block.
     #
@@ -36,6 +37,10 @@ module Proletariat
       config.configure_with_block(&block)
 
       nil
+    end
+
+    def publish(to, body = '', headers = {})
+      publisher_pool << Message.new(to, body, headers)
     end
 
     def runner
@@ -55,6 +60,10 @@ module Proletariat
     # Internal: Global configuration object.
     def config
       @config ||= Configuration.new
+    end
+
+    def publisher_pool
+      @publisher_pool ||= Publisher.pool(Proletariat.publisher_threads)
     end
   end
 end

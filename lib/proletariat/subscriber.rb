@@ -1,9 +1,7 @@
 module Proletariat
   # Internal: Creates, binds and listens on a RabbitMQ queue. Forwards
   #           messages to a given listener.
-  class Subscriber
-    include Concurrent::Runnable
-
+  class Subscriber < Actor
     include Concerns::Logging
 
     # Public: Creates a new Subscriber instance.
@@ -14,73 +12,28 @@ module Proletariat
       @listener     = listener
       @queue_config = queue_config
 
-      @channel      = Proletariat.connection.create_channel
-
-      @channel.prefetch Proletariat.worker_threads
-
-      @exchange     = @channel.topic Proletariat.exchange_name, durable: true
-      @bunny_queue  = @channel.queue queue_config.queue_name,
-                                     durable: true,
-                                     auto_delete: queue_config.auto_delete
-
       bind_queue
-    end
-
-    # Internal: Called by the Concurrent framework on run. Used here to start
-    #           consumption of the queue and to log the status of the
-    #           subscriber.
-    #
-    # Returns nil.
-    def on_run
       start_consumer
-      log_info 'Now online'
 
-      nil
-    end
-
-    # Internal: Called by the Concurrent framework on run. Used here to stop
-    #           consumption of the queue and to log the status of the
-    #           subscriber.
-    #
-    # Returns nil.
-    def on_stop
-      log_info 'Attempting graceful shutdown.'
-      stop_consumer
-      log_info 'Now offline'
-    end
-
-    # Internal: Called by the Concurrent framework to perform work. Used here
-    #           acknowledge RabbitMQ messages.
-    #
-    # Returns nil.
-    def on_task
-      ready_acknowledgers.each do |acknowledger|
-        acknowledger.acknowledge_on_channel channel
-        acknowledgers.delete acknowledger
+      @ticker = Concurrent::TimerTask.execute(execution: 0.5, timeout: 0.5) do
+        acknowledge_messages
+        clear_retries
       end
-
-      completed_retries.each { |r| scheduled_retries.delete r }
     end
 
-    # Public: Purge the RabbitMQ queue.
+    # Internal: Called on actor termination. Used to stop consumption off the
+    #           queue and end the ticker.
     #
     # Returns nil.
-    def purge
-      bunny_queue.purge
+    def cleanup
+      @ticker.kill   if @ticker
+      stop_consumer  if @consumer
+      @channel.close if @channel && channel.open?
 
       nil
     end
 
     private
-
-    # Internal: Returns the Bunny::Queue in use.
-    attr_reader :bunny_queue
-
-    # Internal: Returns the Bunny::Channel in use.
-    attr_reader :channel
-
-    # Internal: Returns the Bunny::Exchange in use.
-    attr_reader :exchange
 
     # Internal: Returns the listener object.
     attr_reader :listener
@@ -88,6 +41,20 @@ module Proletariat
     # Internal: Returns the queue_config in use.
     attr_reader :queue_config
 
+    # Internal: Acknowledge processed messages.
+    #
+    # Returns nil.
+    def acknowledge_messages
+      ready_acknowledgers.each do |acknowledger|
+        acknowledger.acknowledge_on_channel channel
+        acknowledgers.delete acknowledger
+      end
+
+      nil
+    end
+
+    # Internal: Returns array of Acknowledgers which haven't acknowledged their
+    #           messages.
     def acknowledgers
       @acknowledgers ||= []
     end
@@ -104,11 +71,38 @@ module Proletariat
       nil
     end
 
+    # Internal: Returns the Bunny::Queue in use.
+    def bunny_queue
+      @bunny_queue ||= channel.queue(queue_config.queue_name,
+                                     durable: !Proletariat.test_mode?,
+                                     auto_delete: Proletariat.test_mode?)
+    end
+
+    # Internal: Clear out completed retries.
+    #
+    # Returns nil.
+    def clear_retries
+      completed_retries.each { |r| scheduled_retries.delete r }
+    end
+
+    # Internal: Returns the Bunny::Channel in use.
+    def channel
+      @channel ||= Proletariat.connection.create_channel.tap do |channel|
+        channel.prefetch Proletariat.worker_threads
+      end
+    end
+
     # Internal: Get scheduled retries whose messages have been requeued.
     #
     # Returns an Array of Retrys.
     def completed_retries
       scheduled_retries.select { |r| r.requeued? }
+    end
+
+    # Internal: Returns the Bunny::Exchange in use.
+    def exchange
+      @exchange ||= channel.topic(Proletariat.exchange_name,
+                                  durable: !Proletariat.test_mode?)
     end
 
     # Internal: Forwards all message bodies to listener#post. Auto-acks
@@ -117,12 +111,13 @@ module Proletariat
     # Returns nil.
     def handle_message(info, properties, body)
       if handles_worker_type? properties.headers['worker']
-        future = listener.post?(body, info.routing_key, properties.headers)
-        acknowledgers << Acknowledger.new(future, info.delivery_tag, {
+        message = Message.new(info.routing_key, body, properties.headers)
+        ivar = listener.ask(message)
+        acknowledgers << Acknowledger.new(ivar, info.delivery_tag, {
           message: body, key: info.routing_key, headers: properties.headers,
           worker:  queue_config.queue_name }, scheduled_retries)
       else
-        channel.acknowledge info.delivery_tag
+        channel.ack info.delivery_tag
       end
 
       nil
@@ -156,8 +151,8 @@ module Proletariat
     #
     # Returns nil.
     def start_consumer
-      @consumer = bunny_queue.subscribe ack: true do |info, properties, body|
-        handle_message info, properties, body
+      @consumer = bunny_queue.subscribe manual_ack: true do |info, props, body|
+        handle_message info, props, body
 
         nil
       end
@@ -194,34 +189,36 @@ module Proletariat
     # Internal: Used to watch the state of dispatched Work and send ack/nack
     #           to a RabbitMQ channel.
     class Acknowledger
+      include Concerns::Logging
+
       # Public: Maximum time in seconds to wait synchronously for an
       #         acknowledgement.
       MAX_BLOCK_TIME = 5
 
       # Public: Creates a new Acknowledger instance.
       #
-      # future            - A future-like object holding the Worker response.
+      # ivar              - A ivar-like object holding the Worker response.
       # delivery_tag      - The RabbitMQ delivery tag for ack/nacking.
       # properties        - The original message properties; for requeuing.
       # scheduled_retries - An Array to hold any created Retrys.
-      def initialize(future, delivery_tag, properties, scheduled_retries)
-        @future            = future
+      def initialize(ivar, delivery_tag, properties, scheduled_retries)
+        @ivar              = ivar
         @delivery_tag      = delivery_tag
         @properties        = properties
         @scheduled_retries = scheduled_retries
       end
 
-      # Public: Retrieves the value from the future and sends the relevant
+      # Public: Retrieves the value from the ivar and sends the relevant
       #         acknowledgement on a given channel. Logs a warning if the
-      #         future value is unexpected.
+      #         ivar value is unexpected.
       #
       # channel - The Bunny::Channel to receive the acknowledgement.
       #
       # Returns nil.
       def acknowledge_on_channel(channel)
-        if future.fulfilled?
+        if ivar.fulfilled?
           acknowledge_success(channel)
-        elsif future.rejected?
+        elsif ivar.rejected?
           acknowledge_error(channel)
         end
 
@@ -234,17 +231,17 @@ module Proletariat
       #
       # Returns nil.
       def block_until_acknowledged(channel)
-        future.value(MAX_BLOCK_TIME)
+        ivar.wait(MAX_BLOCK_TIME)
         acknowledge_on_channel(channel)
 
         nil
       end
 
-      # Public: Gets the readiness of the future for acknowledgement use.
+      # Public: Gets the readiness of the ivar for acknowledgement use.
       #
-      # Returns true if future is fulfilled or rejected.
+      # Returns true if ivar is fulfilled or rejected.
       def ready_to_acknowledge?
-        future.state != :pending
+        ivar.completed?
       end
 
       private
@@ -256,8 +253,8 @@ module Proletariat
       #
       # Returns nil.
       def acknowledge_success(channel)
-        case future.value
-        when :ok then channel.acknowledge delivery_tag
+        case ivar.value
+        when :ok then channel.ack delivery_tag
         when :drop then channel.reject delivery_tag, false
         when :requeue then channel.reject delivery_tag, true
         else
@@ -275,10 +272,10 @@ module Proletariat
       #
       # Returns nil.
       def acknowledge_error(channel)
-        Proletariat.logger.error future.reason
+        Proletariat.logger.error ivar.reason
 
         scheduled_retries << Retry.new(properties)
-        channel.acknowledge delivery_tag
+        channel.ack delivery_tag
 
         nil
       end
@@ -286,8 +283,8 @@ module Proletariat
       # Internal: Returns the RabbitMQ delivery tag.
       attr_reader :delivery_tag
 
-      # Internal: Returns the future-like object holding the Worker response.
-      attr_reader :future
+      # Internal: Returns the ivar-like object holding the Worker response.
+      attr_reader :ivar
 
       # Internal: Returns the original message properties.
       attr_reader :properties
@@ -307,11 +304,9 @@ module Proletariat
           properties[:headers]['failures'] = failures
           properties[:headers]['worker']   = properties[:worker]
 
-          @scheduled_task = Concurrent::ScheduledTask.new(retry_delay) do
+          @scheduled_task = Concurrent::ScheduledTask.execute(retry_delay) do
             requeue_message
           end
-
-          @scheduled_task.execute
         end
 
         # Public: Attempt to requeue the message immediately if pending or

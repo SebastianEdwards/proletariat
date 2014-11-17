@@ -2,64 +2,42 @@ require 'proletariat/concerns/logging'
 
 module Proletariat
   # Public: Receives messages and publishes them to a RabbitMQ topic exchange.
-  class Publisher
+  class Publisher < PoolableActor
     include Concerns::Logging
 
-    # Public: Creates a new Publisher instance.
-    def initialize
-      @channel  = Proletariat.connection.create_channel
-      @exchange = channel.topic(Proletariat.exchange_name, durable: true)
-    end
-
-    # Public: Logs the 'online' status of the publisher.
+    # Public: Closes the Bunny::Channel if open.
     #
     # Returns nil.
-    def started
-      log_info 'Now online'
+    def cleanup
+      @channel.close if @channel
 
       nil
     end
 
-    # Public: Logs the 'offline' status of the publisher.
+    # Public: Push a Message to a RabbitMQ topic exchange.
+    #
+    # message - A Message to send.
     #
     # Returns nil.
-    def stopped
-      log_info 'Now offline'
-
-      nil
-    end
-
-    # Public: Logs the 'shutting down' status of the publisher.
-    #
-    # Returns nil.
-    def stopping
-      log_info 'Attempting graceful shutdown.'
-
-      nil
-    end
-
-    # Public: Push a message to a RabbitMQ topic exchange.
-    #
-    # to      - The routing key for the message to as a String. In accordance
-    #           with the RabbitMQ convention you can use the '*' character to
-    #           replace one word and the '#' to replace many words.
-    # message - The message as a String.
-    # headers - Hash of message headers.
-    #
-    # Returns nil.
-    def work(to, message, headers)
-      exchange.publish message, routing_key: to, persistent: true,
-                                headers: headers
-
-      nil
+    def work(message)
+      if message.is_a?(Message)
+        exchange.publish(message.body, routing_key: message.to,
+                                       persistent: !Proletariat.test_mode?,
+                                       headers: message.headers)
+      end
     end
 
     private
 
     # Internal: Returns the Bunny::Channel in use.
-    attr_reader :channel
+    def channel
+      @channel ||= Proletariat.connection.create_channel
+    end
 
     # Internal: Returns the Bunny::Exchange in use.
-    attr_reader :exchange
+    def exchange
+      @exchange ||= channel.topic(Proletariat.exchange_name,
+                                  durable: !Proletariat.test_mode?)
+    end
   end
 end

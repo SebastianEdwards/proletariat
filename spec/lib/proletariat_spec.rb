@@ -30,7 +30,7 @@ class PongWorker < Proletariat::Worker
 
   def work(message, routing_key, headers)
     if self.class.fail_mode == true
-      fail 'Error' unless headers['failures'] == 2
+      fail 'Error' unless headers['failures'] == 1
     end
 
     self.class.ponged = true
@@ -46,36 +46,47 @@ end
 describe Proletariat do
   before do
     Proletariat.configure do
+      config.exchange_name  = 'proletariat-test-suite'
       config.logger         = Logger.new('/dev/null')
+      config.test_mode!
       config.worker_classes = [PingWorker, PongWorker]
     end
 
     PongWorker.fail_mode = false
 
-    Proletariat.purge
-    Proletariat.run!
-    sleep 2
+    Proletariat.run
+
+    sleep 1
   end
 
   after do
     Proletariat.stop
-    Proletariat.purge
+
     PingWorker.pinged = false
     PongWorker.ponged = false
+
+    sleep 0.5
   end
 
   it 'should roughly work' do
     Proletariat.publish 'ping', ''
-    sleep 5
+    sleep 1
 
     expect(PingWorker.pinged).to be_truthy
     expect(PongWorker.ponged).to be_truthy
   end
 
+  it 'should purge between tests' do
+    sleep 1
+
+    expect(PingWorker.pinged).to be_falsey
+    expect(PongWorker.ponged).to be_falsey
+  end
+
   it 'should work in error conditions' do
     PongWorker.fail_mode = true
     Proletariat.publish 'ping', ''
-    sleep 10
+    sleep 4
 
     expect(PingWorker.pinged).to be_truthy
     expect(PongWorker.ponged).to be_truthy

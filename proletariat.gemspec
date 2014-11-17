@@ -16,9 +16,9 @@ Gem::Specification.new do |s|
   s.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
   s.require_paths = ['lib']
 
-  s.add_development_dependency 'rspec', '3.0.0.beta1'
+  s.add_development_dependency 'rspec', '3.1.0'
   s.add_development_dependency 'rubocop'
 
-  s.add_runtime_dependency 'concurrent-ruby', '~> 0.6.1'
-  s.add_runtime_dependency 'bunny', '~> 1.3.1'
+  s.add_runtime_dependency 'concurrent-ruby', '~> 0.7'
+  s.add_runtime_dependency 'bunny', '~> 1.6.3'
 end

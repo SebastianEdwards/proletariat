@@ -7,7 +7,7 @@ namespace :proletariat do
   task run: :environment do
     STDOUT.sync = true
 
-    Proletariat.run!
+    Proletariat.run
 
     at_exit { Proletariat.stop }
 
