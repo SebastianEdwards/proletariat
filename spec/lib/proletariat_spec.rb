@@ -86,7 +86,7 @@ describe Proletariat do
   it 'should work in error conditions' do
     PongWorker.fail_mode = true
     Proletariat.publish 'ping', ''
-    sleep 4
+    sleep 6
 
     expect(PingWorker.pinged).to be_truthy
     expect(PongWorker.ponged).to be_truthy

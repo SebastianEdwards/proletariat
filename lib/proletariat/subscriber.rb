@@ -15,7 +15,7 @@ module Proletariat
       bind_queue
       start_consumer
 
-      @ticker = Concurrent::TimerTask.execute(execution: 0.5, timeout: 0.5) do
+      @ticker = Concurrent::TimerTask.execute(execution: 5, timeout: 2) do
         acknowledge_messages
         clear_retries
       end
@@ -88,7 +88,7 @@ module Proletariat
     # Internal: Returns the Bunny::Channel in use.
     def channel
       @channel ||= Proletariat.connection.create_channel.tap do |channel|
-        channel.prefetch Proletariat.worker_threads
+        channel.prefetch Proletariat.worker_threads + 1
       end
     end
 
@@ -152,6 +152,9 @@ module Proletariat
     # Returns nil.
     def start_consumer
       @consumer = bunny_queue.subscribe manual_ack: true do |info, props, body|
+        acknowledge_messages
+        clear_retries
+
         handle_message info, props, body
 
         nil
