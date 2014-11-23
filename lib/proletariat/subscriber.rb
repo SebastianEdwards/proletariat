@@ -15,6 +15,7 @@ module Proletariat
 
       bind_queue
       start_consumer
+      exception_handler
 
       @ticker = Concurrent::TimerTask.execute(execution: 5, timeout: 2) do
         acknowledge_messages
