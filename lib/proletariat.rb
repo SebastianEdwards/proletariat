@@ -11,6 +11,7 @@ require 'proletariat/concurrency/poolable_actor'
 require 'proletariat/util/worker_description_parser'
 
 require 'proletariat/configuration'
+require 'proletariat/exception_handler'
 require 'proletariat/manager'
 require 'proletariat/message'
 require 'proletariat/publisher'
@@ -18,6 +19,9 @@ require 'proletariat/queue_config'
 require 'proletariat/runner'
 require 'proletariat/subscriber'
 require 'proletariat/worker'
+
+require 'proletariat/exception_handler/drop'
+require 'proletariat/exception_handler/exponential_backoff'
 
 # Public: Creates the Proletariat namespace and holds a process-wide Runner
 #         instance as well as access to the configuration attributes.

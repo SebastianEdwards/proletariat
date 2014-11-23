@@ -30,7 +30,7 @@ class PongWorker < Proletariat::Worker
 
   def work(message, routing_key, headers)
     if self.class.fail_mode == true
-      fail 'Error' unless headers['failures'] == 1
+      fail 'Error' unless headers['x-death'] && headers['x-death'].length == 2
     end
 
     self.class.ponged = true
@@ -86,7 +86,7 @@ describe Proletariat do
   it 'should work in error conditions' do
     PongWorker.fail_mode = true
     Proletariat.publish 'ping', ''
-    sleep 6
+    sleep 15
 
     expect(PingWorker.pinged).to be_truthy
     expect(PongWorker.ponged).to be_truthy

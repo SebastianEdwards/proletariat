@@ -12,7 +12,11 @@ module Proletariat
       @subscriber = Subscriber.spawn!(
         name: "#{worker_class.to_s}_subscriber_#{object_id}",
         supervise: true,
-        args: [workers, generate_queue_config(worker_class)]
+        args: [
+          workers,
+          generate_queue_config(worker_class),
+          get_exception_handler_class(worker_class)
+        ]
       )
     end
 
@@ -23,6 +27,20 @@ module Proletariat
 
     # Internal: Returns an Array of Worker actors.
     attr_reader :workers
+
+    def get_exception_handler_class(worker_class)
+      if worker_class.exception_handler.is_a?(ExceptionHandler)
+        worker_class.exception_handler
+      else
+        name = worker_class.exception_handler
+                           .to_s
+                           .split('_')
+                           .map(&:capitalize)
+                           .join
+
+        Proletariat.const_get(name)
+      end
+    end
 
     # Internal: Builds a new QueueConfig from a given Worker subclass.
     #

@@ -72,7 +72,9 @@ module Proletariat
 
     # Public: Handles an incoming message to perform background work.
     #
-    # message - The incoming message.
+    # message     - The incoming message.
+    # routing_key - The incoming message's routing key.
+    # headers     - The incoming message's headers.
     #
     # Raises NotImplementedError unless implemented in subclass.
     def work(message, routing_key, headers)
@@ -86,6 +88,14 @@ module Proletariat
 
     # Internal: Class methods on Worker to provide configuration DSL.
     module ConfigurationMethods
+      def exception_handler(value = nil)
+        if value
+          @exception_handler = value
+        else
+          @exception_handler || :exponential_backoff
+        end
+      end
+
       # Public: A configuration method for adding a routing key to be used when
       #         binding this worker type's queue to an exchange.
       #

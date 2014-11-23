@@ -23,11 +23,11 @@ module Proletariat
         @subscribers = []
 
         expectations.each_with_index do |expectation, i|
-          queue_config = generate_queue_config_for_topic(expectation.topics)
+          config = generate_queue_config_for_topic(expectation.topics)
           suffix = "_#{i}_#{object_id}"
           counter = MessageCounter.spawn!("c#{suffix}", expectation.quantity)
           counters << counter
-          subscribers << Subscriber.spawn!("s#{suffix}", counter, queue_config)
+          subscribers << Subscriber.spawn!("s#{suffix}", counter, config, Drop)
         end
 
         @block = block
