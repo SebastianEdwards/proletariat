@@ -33,21 +33,21 @@ If you aren't using default RabbitMQ connection settings, ensure the `RABBITMQ_U
 
 Your worker classes should inherit from `Proletariat::Worker` and implement the `#work` method.
 
-Proletariat works exclusively on RabbitMQ Topic exchanges and routing keys can be bound via a call to `.listen_on`. This can be called multiple times to bind to multiple keys.
+Proletariat works exclusively on RabbitMQ Topic exchanges. Routing keys can be bound via a call to `.listen_on`. This can be called multiple times to bind to multiple keys. Topic wildcards `*` and `#` may both be used.
 
 The `#work` method should return `:ok` on success or `:drop` / `:requeue` on failure.
 
 Here's a complete example:
 
     class SendUserIntroductoryEmail < Proletariat::Worker
-      listen_on 'user.created'
+      listen_on 'user.*.user_created'
 
       def work(message, key, headers)
         params = JSON.parse(message)
 
         UserMailer.introductory_email(params).deliver!
 
-        publish 'email_sent.user.introductory', {id: params['id']}.to_json
+        publish "user.#{params['id']}.introductory_email_sent", {id: params['id']}.to_json
 
         :ok
       end
@@ -67,11 +67,11 @@ Run the rake command.
 
 It's not recommended to run your background workers in the same process as your main web process. Heroku will shutdown idle `web` processes, killing your background workers in the process. Instead create a new process type for Proletariat by adding the following to your Procfile:
 
-    workers: bundle exec rake proletariat:run
+    worker: bundle exec rake proletariat:run
 
 And run:
 
-    heroku ps:scale workers=1
+    heroku ps:scale worker=1
 
 ### Testing with Cucumber
 
@@ -98,7 +98,3 @@ Use the provided helpers in your step definitions to synchronize your test suite
 #### Why build another RabbitMQ background worker library?
 
 I wanted a library which shared one RabbitMQ connection across all of the workers on a given process. Many hosted RabbitMQ platforms tightly limit the max number of connections.
-
-## TODO
-- Add command line interface
-- Abstract retry strategies
