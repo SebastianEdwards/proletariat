@@ -4,12 +4,6 @@ Lightweight background processing in Ruby powered by RabbitMQ and the excellent 
 
 [![Code Climate](https://codeclimate.com/github/SebastianEdwards/proletariat.png)](https://codeclimate.com/github/SebastianEdwards/proletariat)
 
-### Warning!
-
-This software is early-alpha, may contain bugs and change considerably in the near future.
-
-For production use I recommend the better supported and more fully-featured [Sneakers gem](https://github.com/jondot/sneakers).
-
 ## Installation
 
 Add this line to your application's `Gemfile`:
