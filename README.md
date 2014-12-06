@@ -12,10 +12,9 @@ For production use I recommend the better supported and more fully-featured [Sne
 
 ## Installation
 
-Add these lines to your application's `Gemfile`:
+Add this line to your application's `Gemfile`:
 
     gem 'proletariat'
-    gem 'concurrent-ruby', github: 'ruby-concurrency/concurrent-ruby'
 
 And run:
 
